@@ -483,7 +483,7 @@ object Benchmark{
         }
         (map, count)
       },
-      Case("Array (immutable copy)", x => x -> Array.fill(x)(obj)){ case (n, a) =>
+      Case("Array (copy)", x => x -> Array.fill(x)(obj)){ case (n, a) =>
         var count = a.length
         var array = a
         var i = 0
@@ -494,7 +494,7 @@ object Benchmark{
         }
         (array, count)
       },
-      Case("Array (inplace)", x => x -> Array.fill(x)(obj)){ case (n, a) =>
+      Case("Array (in place)", x => x -> Array.fill(x)(obj)){ case (n, a) =>
         var count = a.length
         var array = a
         var i = 0
