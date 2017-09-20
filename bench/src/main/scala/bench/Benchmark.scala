@@ -1,6 +1,7 @@
 package bench
 
 import scala.collection.mutable
+import scala.concurrent.duration.Duration
 
 case class Benchmark(name: String,
                      cases: Benchmark.Case[_]*)
@@ -8,7 +9,21 @@ object Benchmark{
   case class Case[T](name: String,
                      initializer: Int => T)
                     (callback: T => (Any, Int)) {
-    def run(n: Int): Int = callback(initializer(n))._2
+    def run(size: Int, duration: Int): (Int, Long) = {
+      System.gc()
+      //if (run) {
+      val initialized = initializer(size)
+      val start = System.currentTimeMillis()
+      var count = 0
+      while (System.currentTimeMillis() - start < duration) {
+        val elem_count = callback(initialized)._2
+        count = count + (if (elem_count > 0) elem_count else 1)
+      }
+      val end = System.currentTimeMillis()
+      (count, end - start)
+
+      //callback(initialized)._2
+    }
   }
   def pair[T](t: => T) = (t, t)
   val nullO: Object = null
@@ -96,6 +111,24 @@ object Benchmark{
           i += 1
         }
         (b.toMap, n)
+      },
+      Case("TreeMap (int)", n=>n){ n =>
+        var b = scala.collection.immutable.TreeMap[Int, Object]()
+        var i = 0
+        while(i < n) {
+          b = b + (i -> obj)
+          i += 1
+        }
+        (b, n)
+      },
+      Case("TreeMap (string)", n=>n){ n =>
+        var b = scala.collection.immutable.TreeMap[String, Object]()
+        var i = 0
+        while(i < n) {
+          b = b + (i.toString -> obj)
+          i += 1
+        }
+        (b, n)
       },
       Case("m.Buffer", n=>n){ n =>
         val b = mutable.Buffer.empty[Object]
@@ -204,7 +237,7 @@ object Benchmark{
 //      }
 //    ),
     Benchmark(
-      "foreach",
+      "foreach (*10)",
       Case("List", List.fill(_)(obj)){ a =>
         var last = nullO
         var count = 0
@@ -235,6 +268,52 @@ object Benchmark{
         var count = 0
         var i = 0
         //var last = nullO
+        while(i < 10) {
+          a.foreach{x => {last = x; count += 1}}
+          i += 1
+        }
+        (last, count)
+      },
+      Case("Vector-while", x => x -> Vector.fill(x)(obj)){ case (n, a) =>
+        var last = nullO
+        var count = 0
+        var i = 0
+        //var last = nullO
+        while(i < 10) {
+          var j = 0
+          while(j < n){
+            last = a(j)
+            count += 1
+            j += 1
+          }
+          i += 1
+        }
+        (last, count)
+      },
+      Case("TreeMap (int)", x => {
+        var count = 0
+
+        val a = Array.fill(x){val pair = count -> obj; count += 2; pair}
+        scala.collection.immutable.TreeMap[Int, Object](a: _*)
+      }){ a =>
+        var i = 0
+        var last = nullO
+        var count = 0
+        while(i < 10) {
+          a.foreach{x => {last = x; count += 1}}
+          i += 1
+        }
+        (last, count)
+      },
+      Case("TreeMap (string)", x => {
+        var count = 0
+
+        val a = Array.fill(x){val pair = count.toString -> obj; count += 2; pair}
+        scala.collection.immutable.TreeMap[String, Object](a: _*)
+      }){ a =>
+        var i = 0
+        var last = nullO
+        var count = 0
         while(i < 10) {
           a.foreach{x => {last = x; count += 1}}
           i += 1
@@ -318,7 +397,7 @@ object Benchmark{
       }
     ),
     Benchmark(
-        "lookup",
+        "lookup (*10)",
         Case("List", x => x -> List.fill(x)(obj)){ case (n, a) =>
           var i = 0
           var last = nullO
@@ -370,6 +449,48 @@ object Benchmark{
       },
       Case("Map", x => {
         val r = Array.fill(x)(obj -> obj).toMap
+        r.keysIterator.toArray -> r
+      }){ case (keys, a) =>
+        var last = nullO
+        var count = 0
+        var i = 0
+        while(i < 10) {
+          var j = 0
+          val n = keys.length
+          while (j < n) {
+            last = a(keys(j))
+            count += i
+            j += 1
+          }
+          i += 1
+        }
+        (last, count)
+      },
+      Case("TreeMap (int)", x => {
+        var count = 0
+        val a = Array.fill(x){val pair = count -> obj; count += 1; pair}
+        val r = scala.collection.immutable.TreeMap[Int, Object](a: _*)
+        r.keysIterator.toArray -> r
+      }){ case (keys, a) =>
+        var last = nullO
+        var count = 0
+        var i = 0
+        while(i < 10) {
+          var j = 0
+          val n = keys.length
+          while (j < n) {
+            last = a(keys(j))
+            count += i
+            j += 1
+          }
+          i += 1
+        }
+        (last, count)
+      },
+      Case("TreeMap (string)", x => {
+        var count = 0
+        val a = Array.fill(x){val pair = count.toString -> obj; count += 1; pair}
+        val r = scala.collection.immutable.TreeMap[String, Object](a: _*)
         r.keysIterator.toArray -> r
       }){ case (keys, a) =>
         var last = nullO
@@ -483,6 +604,36 @@ object Benchmark{
         }
         (map, count)
       },
+      Case("TreeMap (int)", x => {
+        var count = 0
+        val a = Array.fill(x){val pair = count -> obj; count += 1; pair}
+        val r = scala.collection.immutable.TreeMap[Int, Object](a: _*)
+        r.keysIterator.toArray -> r
+      }){ case (keys, a) =>
+        var count = a.size
+        var map = a
+        var i = 0
+        while(i < count) {
+          map += (i -> obj)
+          i += 1
+        }
+        (map, count)
+      },
+      Case("TreeMap (string)", x => {
+        var count = 0
+        val a = Array.fill(x){val pair = count.toString -> obj; count += 1; pair}
+        val r = scala.collection.immutable.TreeMap[String, Object](a: _*)
+        r.keysIterator.toArray -> r
+      }){ case (keys, a) =>
+        var count = a.size
+        var map = a
+        var i = 0
+        while(i < count) {
+          map += (i.toString -> obj)
+          i += 1
+        }
+        (map, count)
+      },
       Case("Array (copy)", x => x -> Array.fill(x)(obj)){ case (n, a) =>
         var count = a.length
         var array = a
@@ -494,6 +645,9 @@ object Benchmark{
         }
         (array, count)
       },
+    ),
+    Benchmark(
+      "mutable update",
       Case("Array (in place)", x => x -> Array.fill(x)(obj)){ case (n, a) =>
         var count = a.length
         var array = a
@@ -513,8 +667,10 @@ object Benchmark{
         var last = nullO
         var i = 0
         while(i < count) {
-          vec = vec.slice(0, i) ++ Seq(obj) ++ vec.slice(i + 1, count)
-          //  vec.updated(i, obj)
+          val (iter1, iter2) = vec.toIterable.splitAt(i)
+          val iter = iter1 ++ Iterable(obj) ++ iter2
+          // TODO We must be able to do this more efficiently.
+          vec = Vector(iter)
           i += 1
         }
         (vec, count)
@@ -530,6 +686,40 @@ object Benchmark{
         var i = 1
         while(i < loop_limit) {
           map += (i -> obj)
+          i += 2
+        }
+        (map, count)
+      },
+      Case("TreeMap (int)", x => {
+        var count = 0
+
+        val a = Array.fill(x){val pair = count -> obj; count += 2; pair}
+        val r = scala.collection.immutable.TreeMap[Int, Object](a: _*)
+        r.keysIterator.toArray -> r
+      }){ case (keys, a) =>
+        var count = a.size
+        val loop_limit = count * 2
+        var map = a
+        var i = 1
+        while(i < loop_limit) {
+          map += (i -> obj)
+          i += 2
+        }
+        (map, count)
+      },
+      Case("TreeMap (string)", x => {
+        var count = 0
+
+        val a = Array.fill(x){val pair = count.toString -> obj; count += 2; pair}
+        val r = scala.collection.immutable.TreeMap[String, Object](a: _*)
+        r.keysIterator.toArray -> r
+      }){ case (keys, a) =>
+        var count = a.size
+        val loop_limit = count * 2
+        var map = a
+        var i = 1
+        while(i < loop_limit) {
+          map += (i.toString -> obj)
           i += 2
         }
         (map, count)

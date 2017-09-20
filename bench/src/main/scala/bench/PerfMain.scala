@@ -13,19 +13,23 @@ object PerfMain{
   def main(args: Array[String]): Unit = {
 
     def printRow[I: Integral](name: String, items: Seq[I]) = {
-      val width = 15
-      println(
-        name.padTo(width, ' ') +
-          items.map(NumberFormat.getNumberInstance(Locale.US).format)
-            .map(_.reverse.padTo(width, ' ').reverse).mkString
-      )
+      val str = (List(name) ++ items.map(_.toString)).mkString("| "," | ", " |")
+      println(str)
     }
+//    def printRow[I: Integral](name: String, items: Seq[I]) = {
+//      val width = 15
+//      println(
+//        name.padTo(width, ' ') +
+//          items.map(NumberFormat.getNumberInstance(Locale.US).format)
+//            .map(_.reverse.padTo(width, ' ').reverse).mkString
+//      )
+//    }
     // How large the collections will be in each benchmark
-    val sizes = Seq(0, 1, 4, 16, 64, 256, 1024, 4096, 16192, 65536, 262144, 1048576)
+    val sizes = Seq(1, 4, 16, 64, 256, 1024, 4096, 16192, 65536, 262144, 1048576)
     // How many times to repeat each benchmark
-    val repeats = 1//7
+    val repeats = 13/7
     // How long each benchmark runs, in millis
-    val duration = 1000
+    val duration = 2000
     // How long a benchmark can run before we stop incrementing it
     val cutoff = 5000//400 * 1000 * 1000
 
@@ -36,7 +40,7 @@ object PerfMain{
       println("Run " + i)
       for(benchmark <- Benchmark.benchmarks){
         println()
-        println(benchmark.name)
+        println(s"| ${benchmark.name} |")
         println()
         for (bench <- benchmark.cases){
           val key = benchmark.name -> bench.name
@@ -45,24 +49,25 @@ object PerfMain{
           val times =
             for(size <- sizes if !(cutoffSizes.getOrElse(key, Int.MaxValue) < size)) yield{
               val buf = output.getOrElseUpdate((benchmark.name, bench.name, size), mutable.Buffer())
-              def handle(run: Boolean) = {
-                System.gc()
-                if (run) {
-                  val start = System.currentTimeMillis()
-                  var count = 0
-                  while (System.currentTimeMillis() - start < duration) {
-                    val elem_count = bench.run(size)
-                    count = count + (if (elem_count > 0) elem_count else 1)
-                  }
-                  val end = System.currentTimeMillis()
-                  (count, end - start)
-                } else {
-                  bench.initializer(size)
-                  (1, 0L)
-                }
-              }
-              val (initCounts, initTime) = handle(run = false)
-              val (runCounts, runTime) = handle(run = true)
+//              def handle(run: Boolean) = {
+//                System.gc()
+//                //if (run) {
+//                  val initialized = bench.initializer(size)
+//                  val start = System.currentTimeMillis()
+//                  var count = 0
+//                  while (System.currentTimeMillis() - start < duration) {
+//                    val elem_count = bench.run(initialized)
+//                    count = count + (if (elem_count > 0) elem_count else 1)
+//                  }
+//                  val end = System.currentTimeMillis()
+//                  (count, end - start)
+//                //} else {
+                //  bench.initializer(size)
+                //  (1, 0L)
+                //}
+              //}
+              //val (initCounts, initTime) = handle(run = false)
+              val (runCounts, runTime) = bench.run(size, duration)
 //              val res = ((runTime.toDouble / runCounts - initTime.toDouble / initCounts) * 1000000).toLong
               // Convert the runtime to nano seconds
               val res = (runTime * 1000000 / runCounts)
